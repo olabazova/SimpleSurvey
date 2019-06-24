@@ -1,0 +1,61 @@
+from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login
+from .models import Survey, SurveyAnswer, QuestionAnswer, Choice
+
+def index(request):
+    ctx = {}
+    return render(request, 'main.html', ctx)
+
+
+def admin_login(request):
+    admin_username = request.POST['username']
+    admin_password = request.POST['password']
+    user = authenticate(request, username = admin_username, password = admin_password)
+    if user is not None:
+        login(request, user)
+        return redirect('admin-panel')
+    ctx = {'message':"Unable to login as administrator"}
+    return render(request, 'error.html', ctx)
+
+
+def admin_panel(request):
+    surveys = Survey.objects.all()
+    ctx = {'surveys': surveys}
+    return render(request,'admin-dashboard.html',ctx)
+
+
+def survey_view(request, survey_id = None):
+    try:
+        survey = Survey.objects.get(id = survey_id)
+        questions = survey.question_set.all()
+        ctx = {
+           'survey':survey,
+           'questions':questions,
+          }
+    except:
+        error_message = "Survey #" + str(survey_id) + " not found"
+        return render(request,'error.html',{'message':error_message})
+    return render(request,'survey-view.html',ctx)
+
+
+def load_survey(request):
+    survey_id = request.POST['survey_id']
+    return redirect('survey-view', int(survey_id))
+
+
+def survey_fill(request):
+    answer = SurveyAnswer()
+    survey_submitted = Survey.objects.get(id=request.POST['survey_id'])
+    answer.survey = survey_submitted
+    answer.save()
+
+    questions = survey_submitted.question_set.all()
+
+    for question in questions:
+        question_post = request.POST['question'+str(question.id)]
+        qa = QuestionAnswer()
+        qa.survey_answer = answer
+        qa.choice = Choice.objects.get(id=int(question_post))
+        qa.save()
+
+    return render(request,'survey-complete.html',{})
